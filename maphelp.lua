@@ -1,23 +1,23 @@
 -- =========================================================
 -- House Desc & Web API Integration (MERGED)
--- �����:
--- 1 ������:
+-- Взято:
+-- 1 скрипт:
 --  - help_notif
---  - �������
---  - ������� house_info / trailer_info / biz_info
---  - ��������������� ����
+--  - парсинг
+--  - команды house_info / trailer_info / biz_info
+--  - автокопирование ника
 --
--- 2 ������:
---  - ���� UI
---  - �������
+-- 2 скрипт:
+--  - весь UI
+--  - очередь
 --  - API
---  - �����
---  - �������� ��������
+--  - стили
+--  - массовая отправка
 -- =========================================================
 
 script_name("House Desc & Web API Integration (Merged)")
 script_author("haz1k & AI")
-script_version('11.0')
+script_version('0.1')
 
 local sampev = require('lib.samp.events')
 local imgui = require 'imgui'
@@ -79,35 +79,35 @@ local API_URL = "https://map.queen-creek.ru/api/forms_create.php"
 
 -- =========================================================
 -- GITHUB AUTOUPDATE CONFIG
--- Замени на свои данные перед публикацией:
---   GITHUB_USER        — твой ник на GitHub
---   GITHUB_REPO        — название репозитория
---   GITHUB_BRANCH      — ветка (main или master)
---   GITHUB_SCRIPT_PATH — путь к .lua файлу в репозитории
+-- Р—Р°РјРµРЅРё РЅР° СЃРІРѕРё РґР°РЅРЅС‹Рµ РїРµСЂРµРґ РїСѓР±Р»РёРєР°С†РёРµР№:
+--   GITHUB_USER        вЂ” С‚РІРѕР№ РЅРёРє РЅР° GitHub
+--   GITHUB_REPO        вЂ” РЅР°Р·РІР°РЅРёРµ СЂРµРїРѕР·РёС‚РѕСЂРёСЏ
+--   GITHUB_BRANCH      вЂ” РІРµС‚РєР° (main РёР»Рё master)
+--   GITHUB_SCRIPT_PATH вЂ” РїСѓС‚СЊ Рє .lua С„Р°Р№Р»Сѓ РІ СЂРµРїРѕР·РёС‚РѕСЂРёРё
 -- =========================================================
-local GITHUB_USER        = "YOUR_GITHUB_USER"
-local GITHUB_REPO        = "YOUR_REPO_NAME"
+local GITHUB_USER        = "ha4zy444k"
+local GITHUB_REPO        = "MappingHelper"
 local GITHUB_BRANCH      = "main"
 local GITHUB_SCRIPT_PATH = "maphelp.lua"
 local GITHUB_VERSION_URL = "https://raw.githubusercontent.com/" .. GITHUB_USER .. "/" .. GITHUB_REPO .. "/" .. GITHUB_BRANCH .. "/version.json"
 local GITHUB_SCRIPT_URL  = "https://raw.githubusercontent.com/" .. GITHUB_USER .. "/" .. GITHUB_REPO .. "/" .. GITHUB_BRANCH .. "/" .. GITHUB_SCRIPT_PATH
 
 --[[
-Пример version.json, который нужно положить в корень репозитория:
+РџСЂРёРјРµСЂ version.json, РєРѕС‚РѕСЂС‹Р№ РЅСѓР¶РЅРѕ РїРѕР»РѕР¶РёС‚СЊ РІ РєРѕСЂРµРЅСЊ СЂРµРїРѕР·РёС‚РѕСЂРёСЏ:
 {
     "version": "11.1",
     "download_url": "https://raw.githubusercontent.com/YOUR_GITHUB_USER/YOUR_REPO_NAME/main/maphelp.lua",
     "changelog": [
-        "Новая фича 1",
-        "Исправлен баг X"
+        "РќРѕРІР°СЏ С„РёС‡Р° 1",
+        "Р�СЃРїСЂР°РІР»РµРЅ Р±Р°Рі X"
     ]
 }
-Поле "download_url" в version.json имеет приоритет над GITHUB_SCRIPT_URL.
+РџРѕР»Рµ "download_url" РІ version.json РёРјРµРµС‚ РїСЂРёРѕСЂРёС‚РµС‚ РЅР°Рґ GITHUB_SCRIPT_URL.
 --]]
 
 local scriptVersion = "11.0"
 
--- Состояние системы автообновления
+-- РЎРѕСЃС‚РѕСЏРЅРёРµ СЃРёСЃС‚РµРјС‹ Р°РІС‚РѕРѕР±РЅРѕРІР»РµРЅРёСЏ
 local updateState = {
     checking       = false,
     checked        = false,
@@ -147,30 +147,30 @@ local property_type = imgui.ImInt(0)
 local property_id = imgui.ImBuffer(u8(""), 200)
 
 local templates = {
-    { title = u8"������ �� ��������", pattern = u8"������� ������ ������ �� �������� ����� %s %s", state = imgui.ImBool(false) },
-    { title = u8"������/���� �� ������", pattern = u8"������� ������/���� �� ������� %s %s", state = imgui.ImBool(false) },
-    { title = u8"����� �� ��������", pattern = u8"������� ������ ���� �� �������� ����� %s %s", state = imgui.ImBool(false) },
-    { title = u8"�������� �������", pattern = u8"������� ������������ ������� ����� %s %s", state = imgui.ImBool(false) },
-    { title = u8"������ �������", pattern = u8"������� �������, �������� ������� ���������� ����� %s %s", state = imgui.ImBool(false) },
-    { title = u8"���������� ����������", pattern = u8"������� ��������� ������� ����� %s %s", state = imgui.ImBool(false) },
-    { title = u8"������� � ������ �����", pattern = u8"������� �������, ��������� ������ ����� %s %s", state = imgui.ImBool(false) },
-    { title = u8"������� � ��������", pattern = u8"������� ������� �� �������, %s %s", state = imgui.ImBool(false) },
-    { title = u8"�������. �������� ����", pattern = u8"������� �������, ����������������� �������� ����� %s %s", state = imgui.ImBool(false) },
-    { title = u8"���", pattern = u8"������� ��� ������� ����� %s %s", state = imgui.ImBool(false) },
-    { title = u8"��������� ��������", pattern = u8"��������� �������� ��������� %s %s", state = imgui.ImBool(false) },
-    { title = u8"������ ���", pattern = u8"������� ������������ ������� ����� %s %s", state = imgui.ImBool(false) },
-    { title = u8"2 ����", pattern = u8"������� ������ ���� �� �������� ����� %s %s", state = imgui.ImBool(false) },
+    { title = u8"Дерево из асфальта", pattern = u8"Уберите объект Дерево из асфальта возле %s %s", state = imgui.ImBool(false) },
+    { title = u8"Дерево/гриб на здании", pattern = u8"Уберите дерево/гриб из текстур %s %s", state = imgui.ImBool(false) },
+    { title = u8"Грибы из асфальта", pattern = u8"Уберите объект Гриб из асфальта возле %s %s", state = imgui.ImBool(false) },
+    { title = u8"Летающий маппинг", pattern = u8"Уберите левитирующие объекты возле %s %s", state = imgui.ImBool(false) },
+    { title = u8"Помеха маппинг", pattern = u8"Уберите объекты, мешающие проезду транспорта возле %s %s", state = imgui.ImBool(false) },
+    { title = u8"Перегрузка территории", pattern = u8"Уберите массивные объекты возле %s %s", state = imgui.ImBool(false) },
+    { title = u8"Маппинг в людном месте", pattern = u8"Уберите объекты, создающие помеху возле %s %s", state = imgui.ImBool(false) },
+    { title = u8"Трейлер в текстуре", pattern = u8"Уберите трейлер из текстур, %s %s", state = imgui.ImBool(false) },
+    { title = u8"Несоотв. тематике биза", pattern = u8"Уберите объекты, несоответствующие тематике возле %s %s", state = imgui.ImBool(false) },
+    { title = u8"НРП", pattern = u8"Уберите НРП объекты возле %s %s", state = imgui.ImBool(false) },
+    { title = u8"Неадекват название", pattern = u8"Поменяйте название имущества %s %s", state = imgui.ImBool(false) },
+    { title = u8"Кривой мап", pattern = u8"Уберите кривостоящие объекты возле %s %s", state = imgui.ImBool(false) },
+    { title = u8"2 этаж", pattern = u8"Уберите второй этаж из объектов возле %s %s", state = imgui.ImBool(false) },
 }
 
--- ������ ���������� (����������� �������)
+-- Список обновлений (заполняется вручную)
 local updates_list = {
-    { version = "11.1", changes = { "��������� ������� � ������������", "����������� ��������� ���� ������� �����", "���������� ������ � ������ ������ � imgui-����" } },
-    { version = "11.0", changes = { "������� �������� � API" } }
+    { version = "11.1", changes = { "Добавлена вкладка с обновлениями", "Возможность указывать свою причину формы", "Исправлена ошибка с вводом текста в imgui-поля" } },
+    { version = "11.0", changes = { "Система очередей и API" } }
 }
 
--- ����� ��� ����� �������
+-- Буфер для своей причины
 local custom_reason_buffer = imgui.ImBuffer(u8(""), 500)
-local tab_selected = imgui.ImInt(0) -- 0 - �����������, 1 - ����������
+local tab_selected = imgui.ImInt(0) -- 0 - Конструктор, 1 - Обновления
 
 function sendGradientMessage(tag, text)
     sampAddChatMessage("{3399FF}[" .. tag .. "] {66CCFF}" .. text:gsub("{FFFFFF}", "{FFFFFF}{66CCFF}"), -1)
@@ -267,7 +267,7 @@ function savePendingData()
         logDebug(
             "Autosave",
             "info",
-            "������ ���������"
+            "Данные сохранены"
         )
     end
 end
@@ -292,7 +292,7 @@ function loadPendingData()
         logDebug(
             "Autosave",
             "error",
-            "������ ������ autosave"
+            "Ошибка чтения autosave"
         )
         return
     end
@@ -328,7 +328,7 @@ function loadPendingData()
     logDebug(
         "Autosave",
         "success",
-        "������������� ����� �������������"
+        "Незавершённые формы восстановлены"
     )
 end
 
@@ -393,26 +393,26 @@ function updateTemplateText()
     local selected_patterns = {}
     local ids_list = parseInputString(property_id.v)
     
-    -- ����������� ����
-    local current_type = "���������"
+    -- Определение типа
+    local current_type = "имущества"
     if property_type.v == 0 then
-        current_type = (#ids_list > 1) and "�����" or "����"
+        current_type = (#ids_list > 1) and "домов" or "дома"
     elseif property_type.v == 1 then
-        current_type = (#ids_list > 1) and "���������" or "��������"
+        current_type = (#ids_list > 1) and "трейлеров" or "трейлера"
     elseif property_type.v == 2 then
-        current_type = (#ids_list > 1) and "��������" or "�������"
+        current_type = (#ids_list > 1) and "бизнесов" or "бизнеса"
     end
 
     local formatted_ids = formatPropertyIds(property_id.v)
 
-    -- ���������� ��������� ��������
+    -- Добавление выбранных шаблонов
     for _, t in ipairs(templates) do
         if t.state.v then
             table.insert(selected_patterns, string.format(u8:decode(t.pattern), current_type, formatted_ids))
         end
     end
 
-    -- ���������� ����� ������� � ����������������
+    -- Добавление своей причины с автоподстановкой
     if custom_reason_buffer.v ~= "" then
         local custom = u8:decode(custom_reason_buffer.v)
         table.insert(selected_patterns, string.format(custom .. " %s %s", current_type, formatted_ids))
@@ -432,7 +432,7 @@ function addToQueue()
     local text = create_notif_text.v
 
     if #nicks == 0 or text == "" then
-        logDebug("Queue", "error", "������ ��� ��� �����")
+        logDebug("Queue", "error", "Пустой ник или текст")
         return
     end
 
@@ -457,7 +457,7 @@ end
 
 function processNotifications(action_type)
     if #upload_queue == 0 then
-        logDebug("Core", "error", "������� �����!")
+        logDebug("Core", "error", "Очередь пуста!")
         return
     end
 
@@ -481,7 +481,7 @@ function processNotifications(action_type)
     end
 
     if config.api_key == "" then
-        logDebug("API", "error", "����������� API KEY")
+        logDebug("API", "error", "Отсутствует API KEY")
         return
     end
 
@@ -508,15 +508,15 @@ function processNotifications(action_type)
     )
 
     if executeSilentHidden(curl_command) then
-        logDebug("API", "success", "����� ���������")
+        logDebug("API", "success", "Пакет отправлен")
         upload_queue = {}
     else
-        logDebug("API", "error", "������ curl")
+        logDebug("API", "error", "Ошибка curl")
     end
 end
 
 -- =========================================================
--- ������� �� ������� �������
+-- ПАРСИНГ ИЗ ПЕРВОГО СКРИПТА
 -- =========================================================
 
 function parseHouseData(text)
@@ -533,22 +533,22 @@ function parseHouseData(text)
     for i = 1, #lines do
         local line = lines[i]
 
-        if line:find("����� ����") then
+        if line:find("Номер дома") then
             houseId = tonumber(line:match("(%d+)"))
         end
 
-        if line:find("%*%*%* ��� ����� %*%*%*") then
+        if line:find("%*%*%* Дом занят %*%*%*") then
             local nextLine = lines[i + 1]
 
             if nextLine and nextLine ~= "" then
-                desc = nextLine:find("����� ����") and "�����������" or nextLine
+                desc = nextLine:find("Номер дома") and "Отсутствует" or nextLine
             else
                 desc = lines[i + 2]
             end
         end
 
-        if line:find("��������:") then
-            owner = line:match("��������:%s*(%S+)")
+        if line:find("Владелец:") then
+            owner = line:match("Владелец:%s*(%S+)")
 
             if owner then
                 owner = owner:gsub("%s+$", "")
@@ -556,7 +556,7 @@ function parseHouseData(text)
         end
     end
 
-    return houseId, desc or "�����������", owner or "�����������"
+    return houseId, desc or "Отсутствует", owner or "Отсутствует"
 end
 
 function parseTrailerData(text)
@@ -573,12 +573,12 @@ function parseTrailerData(text)
     for i = 1, #lines do
         local line = lines[i]
 
-        if line:find("������� �") then
+        if line:find("Трейлер №") then
             trailerId = tonumber(line:match("(%d+)"))
         end
 
-        if line:find("��������:") then
-            owner = line:match("��������:%s*(%S+)")
+        if line:find("Владелец:") then
+            owner = line:match("Владелец:%s*(%S+)")
 
             if owner then
                 owner = owner:gsub("%s+$", "")
@@ -586,7 +586,7 @@ function parseTrailerData(text)
         end
     end
 
-    return trailerId, owner or "�����������"
+    return trailerId, owner or "Отсутствует"
 end
 
 function parseBizData(text)
@@ -603,22 +603,22 @@ function parseBizData(text)
     for i = 1, #lines do
         local line = lines[i]
 
-        if line:find("����� �������") then
+        if line:find("Номер бизнеса") then
             bizId = tonumber(line:match("(%d+)"))
         end
 
-        if line:find("����� �������:") then
+        if line:find("Номер бизнеса:") then
             local prevLine = lines[i - 1]
 
             desc = (
                 prevLine
                 and prevLine ~= ""
-                and not prevLine:find("����� �������:")
-            ) and prevLine or "�����������"
+                and not prevLine:find("Номер бизнеса:")
+            ) and prevLine or "Отсутствует"
         end
 
-        if line:find("��������:") then
-            owner = line:match("��������:%s*(%S+)")
+        if line:find("Владелец:") then
+            owner = line:match("Владелец:%s*(%S+)")
 
             if owner then
                 owner = owner:gsub("%s+$", "")
@@ -626,7 +626,7 @@ function parseBizData(text)
         end
     end
 
-    return bizId, owner or "�����������", desc or "�����������"
+    return bizId, owner or "Отсутствует", desc or "Отсутствует"
 end
 
 -- =========================================================
@@ -640,34 +640,34 @@ function imgui.OnDrawFrame()
         imgui.ShowCursor = true
         imgui.SetNextWindowPos(imgui.ImVec2(screenX / 2, screenY / 2), imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
         imgui.SetNextWindowSize(imgui.ImVec2(520, 140), imgui.Cond.Always)
-        imgui.Begin(u8'������ | ���� �����������', auth_window_state, imgui.WindowFlags.NoCollapse)
-        imgui.TextWrapped(u8"������������ X-API-Key �� ������. ��� ������ ������� ������� ����:")
-        imgui.TextColored(imgui.ImVec4(0.25, 0.53, 0.93, 1.0), u8"/set_apikey [���_����]")
+        imgui.Begin(u8'Ошибка | Ключ авторизации', auth_window_state, imgui.WindowFlags.NoCollapse)
+        imgui.TextWrapped(u8"Персональный X-API-Key не найден. Для работы скрипта укажите ключ:")
+        imgui.TextColored(imgui.ImVec4(0.25, 0.53, 0.93, 1.0), u8"/set_apikey [ваш_ключ]")
         imgui.Spacing()
-        if imgui.Button(u8"������� ����", imgui.ImVec2(-1, 30)) then auth_window_state.v = false end
+        if imgui.Button(u8"Закрыть окно", imgui.ImVec2(-1, 30)) then auth_window_state.v = false end
         imgui.End()
     
     elseif main_window_state.v then
         imgui.ShowCursor = true
         
-        -- ������������ ������ ������
-        -- 430 - ��� ������������� ������ ���� ������ ������, 45 - ������ ������ ������ � �������, 
-        -- 120 - ����������� ������ �����/������.
+        -- ДИНАМИЧЕСКИЙ РАСЧЕТ ВЫСОТЫ
+        -- 430 - это фиксированная высота всех блоков сверху, 45 - высота каждой строки в очереди, 
+        -- 120 - минимальный отступ снизу/подвал.
         local queue_items = #upload_queue
         local list_height = (queue_items > 0) and (queue_items * 45 + 30) or 60
         local dynamic_height = 430 + list_height
         
-        -- ������������ ������, ����� ���� �� �������� �� �����
+        -- Ограничиваем высоту, чтобы окно не вылезало за экран
         dynamic_height = math.min(dynamic_height, screenY - 50)
         
         imgui.SetNextWindowPos(imgui.ImVec2(screenX / 2, screenY / 2), imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
         imgui.SetNextWindowSize(imgui.ImVec2(980, dynamic_height), imgui.Cond.Always)
         
-        imgui.Begin(u8'���������� ������������� ���������', main_window_state, imgui.WindowFlags.NoTitleBar + imgui.WindowFlags.NoCollapse + imgui.WindowFlags.NoResize)
+        imgui.Begin(u8'Управление Уведомлениями Имущества', main_window_state, imgui.WindowFlags.NoTitleBar + imgui.WindowFlags.NoCollapse + imgui.WindowFlags.NoResize)
         
-        imgui.TextColored(imgui.ImVec4(0.25, 0.53, 0.93, 1.0), u8" �������� �������� ����������� �� API")
+        imgui.TextColored(imgui.ImVec4(0.25, 0.53, 0.93, 1.0), u8" МАССОВАЯ ОТПРАВКА УВЕДОМЛЕНИЙ НА API")
         imgui.SameLine(460)
-        imgui.TextDisabled(u8(string.format("[ ������ 3D-Text: �����: %d | ���������: %d | ��������: %d ]", total_houses_found, total_trailers_found, total_biz_found)))
+        imgui.TextDisabled(u8(string.format("[ Сканер 3D-Text: Домов: %d | Трейлеров: %d | Бизнесов: %d ]", total_houses_found, total_trailers_found, total_biz_found)))
 
         imgui.SameLine(imgui.GetWindowWidth() - 35)
         if imgui.Button("X", imgui.ImVec2(25, 20)) then main_window_state.v = false end
@@ -678,25 +678,25 @@ function imgui.OnDrawFrame()
         imgui.SetColumnWidth(0, 470)
 
         imgui.BeginChild("LeftDataBlock", imgui.ImVec2(-1, 290), true)
-        imgui.TextColored(imgui.ImVec4(0.6, 0.6, 0.6, 1.0), u8"[ 1. ������� ����������� ]")
+        imgui.TextColored(imgui.ImVec4(0.6, 0.6, 0.6, 1.0), u8"[ 1. ОЧЕРЕДЬ НАРУШИТЕЛЕЙ ]")
         imgui.Spacing()
         
-        imgui.Text(u8"������ ��������� (������ � ����� ������ / ����� ������):")
+        imgui.Text(u8"Список никнеймов (каждый с новой строки / через пробел):")
         imgui.PushItemWidth(-1)
         if imgui.InputTextMultiline( "##nicks_area", create_notif_nicks, imgui.ImVec2(-1, 110) ) then savePendingData() end
         imgui.PopItemWidth()
         
         local detected_nicks = parseInputString(create_notif_nicks.v)
         if #detected_nicks > 0 then
-            imgui.TextColored(imgui.ImVec4(0.0, 1.0, 0.3, 1.0), u8(string.format("  -> �������� ������������ �����: %d (����: ", #detected_nicks)) .. detected_nicks[1] .. u8")")
+            imgui.TextColored(imgui.ImVec4(0.0, 1.0, 0.3, 1.0), u8(string.format("  -> Осталось распределить ников: %d (След: ", #detected_nicks)) .. detected_nicks[1] .. u8")")
         else
-            imgui.TextColored(imgui.ImVec4(1.0, 0.3, 0.3, 1.0), u8"  -> ������ ����� ����")
+            imgui.TextColored(imgui.ImVec4(1.0, 0.3, 0.3, 1.0), u8"  -> Список ников пуст")
         end
         
         imgui.Spacing()
         imgui.PushStyleColor(imgui.Col.Button, imgui.ImVec4(0.12, 0.45, 0.23, 0.85))
         imgui.PushStyleColor(imgui.Col.ButtonHovered, imgui.ImVec4(0.18, 0.60, 0.30, 1.00))
-        if imgui.Button(u8"��������� ��������� � ������� ����", imgui.ImVec2(-1, 42)) then
+        if imgui.Button(u8"ПРИВЯЗАТЬ ИМУЩЕСТВО К ПЕРВОМУ НИКУ", imgui.ImVec2(-1, 42)) then
             addToQueue()
         end
         imgui.PopStyleColor(2)
@@ -704,27 +704,27 @@ function imgui.OnDrawFrame()
 
         imgui.NextColumn()
 
--- ���������� ���� ������������ � �������
+-- ЗАМЕНЕННЫЙ БЛОК КОНСТРУКТОРА И ВКЛАДОК
         imgui.BeginChild("RightConstructorBlock", imgui.ImVec2(-1, 290), true)
         
-        -- �������
-        if imgui.Button(u8"�����������", imgui.ImVec2(220, 25)) then tab_selected.v = 0 end
+        -- Вкладки
+        if imgui.Button(u8"Конструктор", imgui.ImVec2(220, 25)) then tab_selected.v = 0 end
         imgui.SameLine()
-        if imgui.Button(u8"����������", imgui.ImVec2(220, 25)) then tab_selected.v = 1 end
+        if imgui.Button(u8"Обновления", imgui.ImVec2(220, 25)) then tab_selected.v = 1 end
         imgui.Separator()
         imgui.Spacing()
 
         if tab_selected.v == 0 then
-            imgui.TextColored(imgui.ImVec4(0.25, 0.53, 0.93, 1.0), u8"[ 2. ����������� ������ ]")
+            imgui.TextColored(imgui.ImVec4(0.25, 0.53, 0.93, 1.0), u8"[ 2. КОНСТРУКТОР ДАННЫХ ]")
             imgui.Spacing()
             
-            imgui.Text(u8"���:") 
+            imgui.Text(u8"Тип:") 
             imgui.PushItemWidth(120)
-            if imgui.Combo("##prop_type", property_type, { u8"���", u8"�������", u8"������" }) then updateTemplateText() end
+            if imgui.Combo("##prop_type", property_type, { u8"Дом", u8"Трейлер", u8"Бизнес" }) then updateTemplateText() end
             imgui.PopItemWidth()
             
             imgui.SameLine()
-            imgui.Text(u8"ID (����� ������):")
+            imgui.Text(u8"ID (через пробел):")
             imgui.SameLine()
             imgui.PushItemWidth(-1)
             if imgui.InputText("##prop_id", property_id) then
@@ -734,8 +734,8 @@ function imgui.OnDrawFrame()
             imgui.PopItemWidth()
 
             imgui.Spacing()
-            imgui.Text(u8"���� �������:")
-            -- ��������� �������: ���� ����� ���������, �������� ����������
+            imgui.Text(u8"Своя причина:")
+            -- Добавляем условие: если текст изменился, вызываем обновление
             if imgui.InputText("##custom_reason", custom_reason_buffer) then 
                 updateTemplateText() 
             end
@@ -748,21 +748,21 @@ function imgui.OnDrawFrame()
             imgui.EndChild()
 
             imgui.Spacing()
-            imgui.TextColored(imgui.ImVec4(1.0, 0.8, 0.2, 1.0), u8"������ ������:")
+            imgui.TextColored(imgui.ImVec4(1.0, 0.8, 0.2, 1.0), u8"ПРЕВЬЮ СТРОКИ:")
             imgui.BeginChild("PreviewStringBox", imgui.ImVec2(-1, 42), false)
             if create_notif_text.v ~= "" then
                 imgui.TextWrapped(create_notif_text.v)
             else
-                imgui.TextDisabled(u8"(�������� �������� ��� �������� ���� �������)")
+                imgui.TextDisabled(u8"(выберите чекбоксы или напишите свою причину)")
             end
             imgui.EndChild()
         else
-            -- ������� ����������
-            imgui.TextColored(imgui.ImVec4(0.25, 0.53, 0.93, 1.0), u8"[ ������� ���������� ]")
+            -- Вкладка обновлений
+            imgui.TextColored(imgui.ImVec4(0.25, 0.53, 0.93, 1.0), u8"[ ИСТОРИЯ ОБНОВЛЕНИЙ ]")
             imgui.Spacing()
             imgui.BeginChild("UpdatesChild", imgui.ImVec2(-1, -1), true)
             for _, up in ipairs(updates_list) do
-                if imgui.CollapsingHeader(u8("������ " .. up.version)) then
+                if imgui.CollapsingHeader(u8("Версия " .. up.version)) then
                     for _, change in ipairs(up.changes) do
                         imgui.Text("- " .. u8(change))
                     end
@@ -775,7 +775,7 @@ function imgui.OnDrawFrame()
         imgui.Columns(1)
         imgui.Spacing()
 
-        imgui.TextColored(imgui.ImVec4(0.25, 0.53, 0.93, 1.0), u8(string.format("������� � �������� (����� ������� � ������: %d)", #upload_queue)))
+        imgui.TextColored(imgui.ImVec4(0.25, 0.53, 0.93, 1.0), u8(string.format("ОЧЕРЕДЬ К ОТПРАВКЕ (ВСЕГО ЗАПИСЕЙ В ПАКЕТЕ: %d)", #upload_queue)))
         
         if #upload_queue > 0 then
             imgui.BeginChild("QueueTableChild", imgui.ImVec2(-1, list_height - 5), true)
@@ -784,7 +784,7 @@ function imgui.OnDrawFrame()
                 imgui.PushID(i)
                 imgui.PushStyleColor(imgui.Col.Button, imgui.ImVec4(0.65, 0.15, 0.15, 0.8))
                 imgui.PushStyleColor(imgui.Col.ButtonHovered, imgui.ImVec4(0.85, 0.20, 0.20, 1.0))
-                if imgui.Button(u8"�������", imgui.ImVec2(70, 22)) then
+                if imgui.Button(u8"Удалить", imgui.ImVec2(70, 22)) then
                     table.remove(upload_queue, i)
                     savePendingData()
                 end
@@ -798,19 +798,19 @@ function imgui.OnDrawFrame()
 
             imgui.Spacing()
             imgui.Columns(2, "action_buttons", false)
-            if imgui.Button(u8'��������� ��������� TXT-���', imgui.ImVec2(-1, 42)) then 
+            if imgui.Button(u8'Сохранить резервный TXT-лог', imgui.ImVec2(-1, 42)) then 
                 processNotifications("local")
             end
             imgui.NextColumn()
             imgui.PushStyleColor(imgui.Col.Button, imgui.ImVec4(0.18, 0.42, 0.77, 1.0))
-            if imgui.Button(u8'��������� ��� �������������� ����� �� WEB API', imgui.ImVec2(-1, 42)) then 
+            if imgui.Button(u8'ОТПРАВИТЬ ВСЮ СФОРМИРОВАННУЮ ПАЧКУ НА WEB API', imgui.ImVec2(-1, 42)) then 
                 processNotifications("web")
             end
             imgui.PopStyleColor(1)
             imgui.Columns(1)
         else
             imgui.BeginChild("EmptyQueueNotify", imgui.ImVec2(-1, 50), true)
-            imgui.TextColored(imgui.ImVec4(1.0, 0.8, 0.2, 0.8), u8" ������� �����. ��������� ������ ������� �����, ������� �������� ������ � ����������� �����.")
+            imgui.TextColored(imgui.ImVec4(1.0, 0.8, 0.2, 0.8), u8" Очередь пуста. Заполните данные игроков слева, укажите свойства справа и сформируйте пакет.")
             imgui.EndChild()
         end
 
@@ -847,72 +847,97 @@ local function isVersionNewer(remoteVer, localVer)
 end
 
 local function checkForUpdatesAsync()
-    if updateState.checking or updateState.checked then return end
+    if updateState.checking or updateState.checked then
+        logDebug("Update", "warn", "РџСЂРѕРІРµСЂРєР° СѓР¶Рµ РІС‹РїРѕР»РЅСЏРµС‚СЃСЏ РёР»Рё Р±С‹Р»Р° РІС‹РїРѕР»РЅРµРЅР° вЂ” РїСЂРѕРїСѓСЃРє")
+        return
+    end
     updateState.checking = true
+    logDebug("Update", "info", "РќР°С‡Р°Р»Рѕ РїСЂРѕРІРµСЂРєРё РѕР±РЅРѕРІР»РµРЅРёР№...")
+    logDebug("Update", "info", "URL: " .. GITHUB_VERSION_URL)
 
     lua_thread.create(function()
         local dir      = getGameDirectory() .. "\\moonloader\\config\\"
         local tempFile = dir .. "maphelp_version_check.tmp"
+        logDebug("Update", "info", "Р’СЂРµРјРµРЅРЅС‹Р№ С„Р°Р№Р»: " .. tempFile)
 
         local downloadDone = false
         local downloadOk   = false
 
         downloadUrlToFile(GITHUB_VERSION_URL, tempFile, function(id, status, p1, p2)
-            if status == dlstatus.STATUS_ENDDOWNLOADDATA
-            or status == dlstatus.STATUSEX_ENDDOWNLOAD then
+            if status == dlstatus.STATUS_CONNECTING then
+                logDebug("Update", "info", "РџРѕРґРєР»СЋС‡РµРЅРёРµ Рє GitHub...")
+            elseif status == dlstatus.STATUS_REQUESTSENT then
+                logDebug("Update", "info", "Р—Р°РїСЂРѕСЃ РѕС‚РїСЂР°РІР»РµРЅ")
+            elseif status == dlstatus.STATUS_DOWNLOADINGDATA then
+                -- Р±РµР· СЃРїР°РјР° вЂ” СЃСЂР°Р±Р°С‚С‹РІР°РµС‚ РЅР° РєР°Р¶РґС‹Р№ С‡Р°РЅРє
+            elseif status == dlstatus.STATUS_ENDDOWNLOADDATA
+                or status == dlstatus.STATUSEX_ENDDOWNLOAD then
+                logDebug("Update", "success", "version.json СѓСЃРїРµС€РЅРѕ СЃРєР°С‡Р°РЅ")
                 downloadOk   = true
                 downloadDone = true
-            elseif status ~= dlstatus.STATUS_CONNECTING
-               and status ~= dlstatus.STATUS_REQUESTSENT
-               and status ~= dlstatus.STATUS_SENDINGREQUEST
-               and status ~= dlstatus.STATUS_DOWNLOADINGDATA then
+            else
+                logDebug("Update", "error", "РќРµРѕР¶РёРґР°РЅРЅС‹Р№ СЃС‚Р°С‚СѓСЃ Р·Р°РіСЂСѓР·РєРё: " .. tostring(status))
                 downloadDone = true
             end
         end)
 
-        -- Ждём завершения, таймаут 10 секунд
+        -- Р–РґС‘Рј Р·Р°РІРµСЂС€РµРЅРёСЏ, С‚Р°Р№РјР°СѓС‚ 10 СЃРµРєСѓРЅРґ
         local waited = 0
         while not downloadDone and waited < 100 do
             wait(100)
             waited = waited + 1
         end
 
+        if not downloadDone then
+            logDebug("Update", "error", "РўР°Р№РјР°СѓС‚ РѕР¶РёРґР°РЅРёСЏ РѕС‚РІРµС‚Р° РѕС‚ GitHub (10 СЃРµРє)")
+        end
+
         updateState.checking = false
         updateState.checked  = true
+        logDebug("Update", "info", "РџСЂРѕРІРµСЂРєР° Р·Р°РІРµСЂС€РµРЅР° (checking=false, checked=true)")
 
         if not downloadOk then
-            logDebug("Update", "warn", "Не удалось скачать version.json с GitHub")
+            logDebug("Update", "warn", "РќРµ СѓРґР°Р»РѕСЃСЊ СЃРєР°С‡Р°С‚СЊ version.json вЂ” РѕР±РЅРѕРІР»РµРЅРёРµ РїСЂРѕРїСѓС‰РµРЅРѕ")
             if doesFileExist(tempFile) then os.remove(tempFile) end
             return
         end
 
         local f = io.open(tempFile, "r")
         if not f then
-            logDebug("Update", "error", "Не удалось открыть временный файл version.json")
+            logDebug("Update", "error", "РќРµ СѓРґР°Р»РѕСЃСЊ РѕС‚РєСЂС‹С‚СЊ РІСЂРµРјРµРЅРЅС‹Р№ С„Р°Р№Р» РґР»СЏ С‡С‚РµРЅРёСЏ")
             return
         end
         local content = f:read("*a")
         f:close()
         if doesFileExist(tempFile) then os.remove(tempFile) end
+        logDebug("Update", "info", "version.json РїСЂРѕС‡РёС‚Р°РЅ (" .. #content .. " Р±Р°Р№С‚)")
 
         if not content or content == "" then
-            logDebug("Update", "warn", "version.json пустой")
+            logDebug("Update", "warn", "version.json РїСѓСЃС‚РѕР№")
             return
         end
 
+        logDebug("Update", "info", "РџР°СЂСЃРёРЅРі JSON...")
         local ok, data = pcall(cjson.decode, content)
         if not ok or type(data) ~= "table" then
-            logDebug("Update", "error", "Ошибка парсинга version.json: " .. tostring(content):sub(1, 100))
+            logDebug("Update", "error", "РћС€РёР±РєР° РїР°СЂСЃРёРЅРіР° JSON: " .. tostring(content):sub(1, 120))
             return
         end
+        logDebug("Update", "success", "JSON СѓСЃРїРµС€РЅРѕ СЂР°СЃРїР°СЂСЃРµРЅ")
 
         local remoteVersion = data.version
         local downloadUrl   = data.download_url or GITHUB_SCRIPT_URL
 
         if not remoteVersion then
-            logDebug("Update", "warn", "version.json не содержит поле 'version'")
+            logDebug("Update", "warn", "Р’ version.json РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚ РїРѕР»Рµ 'version'")
             return
         end
+
+        logDebug("Update", "info", string.format(
+            "Р›РѕРєР°Р»СЊРЅР°СЏ РІРµСЂСЃРёСЏ: %s | РЈРґР°Р»С‘РЅРЅР°СЏ РІРµСЂСЃРёСЏ: %s",
+            scriptVersion, remoteVersion
+        ))
+        logDebug("Update", "info", "URL РґР»СЏ СЃРєР°С‡РёРІР°РЅРёСЏ: " .. downloadUrl)
 
         if isVersionNewer(remoteVersion, scriptVersion) then
             updateState.available       = true
@@ -921,45 +946,90 @@ local function checkForUpdatesAsync()
             updateState.remoteChangelog = {}
 
             if type(data.changelog) == "table" then
-                for _, item in ipairs(data.changelog) do
+                logDebug("Update", "info", "Changelog: " .. #data.changelog .. " РїСѓРЅРєС‚(Р°/РѕРІ)")
+                for i, item in ipairs(data.changelog) do
+                    logDebug("Update", "info", string.format("  [%d] %s", i, tostring(item)))
                     table.insert(updateState.remoteChangelog, u8(tostring(item)))
                 end
+            else
+                logDebug("Update", "warn", "Changelog РІ version.json РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚ РёР»Рё РЅРµ СЏРІР»СЏРµС‚СЃСЏ РјР°СЃСЃРёРІРѕРј")
             end
 
             updateState.showModal = true
-            logDebug("Update", "success", "Доступна новая версия: " .. remoteVersion)
+            logDebug("Update", "success", string.format(
+                "Р’Р•Р Р”Р�РљРў: РґРѕСЃС‚СѓРїРЅР° РЅРѕРІР°СЏ РІРµСЂСЃРёСЏ %s (С‚РµРєСѓС‰Р°СЏ: %s) вЂ” РїРѕРєР°Р·С‹РІР°РµРј РјРѕРґР°Р»СЊРЅРѕРµ РѕРєРЅРѕ",
+                remoteVersion, scriptVersion
+            ))
         else
-            logDebug("Update", "info", "Версия актуальна: " .. scriptVersion)
+            logDebug("Update", "info", string.format(
+                "Р’Р•Р Р”Р�РљРў: РІРµСЂСЃРёСЏ Р°РєС‚СѓР°Р»СЊРЅР° (%s >= %s) вЂ” РѕР±РЅРѕРІР»РµРЅРёРµ РЅРµ С‚СЂРµР±СѓРµС‚СЃСЏ",
+                scriptVersion, remoteVersion
+            ))
         end
     end)
 end
 
 local function performScriptUpdate()
-    if updateState.downloading or not updateState.downloadUrl then return end
+    if updateState.downloading then
+        logDebug("Update", "warn", "Р—Р°РіСЂСѓР·РєР° СѓР¶Рµ РёРґС‘С‚ вЂ” РїРѕРІС‚РѕСЂРЅС‹Р№ РІС‹Р·РѕРІ РїСЂРѕРёРіРЅРѕСЂРёСЂРѕРІР°РЅ")
+        return
+    end
+    if not updateState.downloadUrl then
+        logDebug("Update", "error", "downloadUrl РЅРµ Р·Р°РґР°РЅ вЂ” РЅРµРІРѕР·РјРѕР¶РЅРѕ РЅР°С‡Р°С‚СЊ Р·Р°РіСЂСѓР·РєСѓ")
+        return
+    end
+
     updateState.downloading    = true
-    updateState.downloadStatus = u8("Загрузка обновления...")
+    updateState.downloadStatus = u8("Р—Р°РіСЂСѓР·РєР° РѕР±РЅРѕРІР»РµРЅРёСЏ...")
+    logDebug("Update", "info", "РќР°С‡Р°Р»Рѕ Р·Р°РіСЂСѓР·РєРё СЃРєСЂРёРїС‚Р°...")
+    logDebug("Update", "info", "URL: " .. updateState.downloadUrl)
 
     local targetPath = thisScript().path
     local tempPath   = targetPath .. ".update.tmp"
+    logDebug("Update", "info", "Р¦РµР»СЊ: " .. targetPath)
+    logDebug("Update", "info", "Р’СЂРµРјРµРЅРЅС‹Р№ С„Р°Р№Р»: " .. tempPath)
 
     downloadUrlToFile(updateState.downloadUrl, tempPath, function(id, status, p1, p2)
-        if status == dlstatus.STATUS_DOWNLOADINGDATA and p2 and p2 > 0 then
-            updateState.downloadStatus = u8("Загрузка: ") .. math.floor((p1 / p2) * 100) .. "%"
+        if status == dlstatus.STATUS_CONNECTING then
+            logDebug("Update", "info", "РџРѕРґРєР»СЋС‡РµРЅРёРµ Рє СЃРµСЂРІРµСЂСѓ Р·Р°РіСЂСѓР·РєРё...")
+        elseif status == dlstatus.STATUS_REQUESTSENT then
+            logDebug("Update", "info", "Р—Р°РїСЂРѕСЃ РЅР° СЃРєР°С‡РёРІР°РЅРёРµ РѕС‚РїСЂР°РІР»РµРЅ")
+        elseif status == dlstatus.STATUS_DOWNLOADINGDATA then
+            if p2 and p2 > 0 then
+                local pct = math.floor((p1 / p2) * 100)
+                updateState.downloadStatus = u8("Р—Р°РіСЂСѓР·РєР°: ") .. pct .. "%"
+                -- Р»РѕРіРёСЂСѓРµРј С‚РѕР»СЊРєРѕ РЅР° РєСЂСѓРіР»С‹С… Р·РЅР°С‡РµРЅРёСЏС… С‡С‚РѕР±С‹ РЅРµ СЃРїР°РјРёС‚СЊ
+                if pct % 25 == 0 then
+                    logDebug("Update", "info", "РџСЂРѕРіСЂРµСЃСЃ: " .. pct .. "% (" .. p1 .. "/" .. p2 .. " Р±Р°Р№С‚)")
+                end
+            else
+                updateState.downloadStatus = u8("Р—Р°РіСЂСѓР·РєР°...")
+            end
         elseif status == dlstatus.STATUS_ENDDOWNLOADDATA
             or status == dlstatus.STATUSEX_ENDDOWNLOAD then
+            logDebug("Update", "info", "Р—Р°РіСЂСѓР·РєР° Р·Р°РІРµСЂС€РµРЅР°, РїСЂРѕРІРµСЂСЏСЋ РІСЂРµРјРµРЅРЅС‹Р№ С„Р°Р№Р»...")
             if doesFileExist(tempPath) then
-                if doesFileExist(targetPath) then os.remove(targetPath) end
+                logDebug("Update", "success", "Р’СЂРµРјРµРЅРЅС‹Р№ С„Р°Р№Р» СЃСѓС‰РµСЃС‚РІСѓРµС‚ вЂ” Р·Р°РјРµРЅСЏСЋ СЃРєСЂРёРїС‚")
+                if doesFileExist(targetPath) then
+                    os.remove(targetPath)
+                    logDebug("Update", "info", "РЎС‚Р°СЂС‹Р№ С„Р°Р№Р» СѓРґР°Р»С‘РЅ: " .. targetPath)
+                end
                 os.rename(tempPath, targetPath)
+                logDebug("Update", "success", "Р¤Р°Р№Р» РїРµСЂРµРјРµС‰С‘РЅ: " .. tempPath .. " -> " .. targetPath)
                 updateState.showModal = false
-                sendGradientMessage("Update", u8("Обновление установлено! Перезагрузка..."))
+                sendGradientMessage("Update", u8("РћР±РЅРѕРІР»РµРЅРёРµ СѓСЃС‚Р°РЅРѕРІР»РµРЅРѕ! РџРµСЂРµР·Р°РіСЂСѓР·РєР°..."))
+                logDebug("Update", "success", "РЎРєСЂРёРїС‚ РѕР±РЅРѕРІР»С‘РЅ РґРѕ РІРµСЂСЃРёРё " .. tostring(updateState.remoteVersion) .. " вЂ” РїРµСЂРµР·Р°РіСЂСѓР·РєР° С‡РµСЂРµР· 0.6 СЃРµРє")
                 lua_thread.create(function()
                     wait(600)
                     thisScript():reload()
                 end)
             else
-                updateState.downloadStatus = u8("Ошибка: файл не скачан")
+                logDebug("Update", "error", "Р’СЂРµРјРµРЅРЅС‹Р№ С„Р°Р№Р» РЅРµ РЅР°Р№РґРµРЅ РїРѕСЃР»Рµ Р·Р°РІРµСЂС€РµРЅРёСЏ Р·Р°РіСЂСѓР·РєРё: " .. tempPath)
+                updateState.downloadStatus = u8("РћС€РёР±РєР°: С„Р°Р№Р» РЅРµ СЃРєР°С‡Р°РЅ")
                 updateState.downloading    = false
             end
+        else
+            logDebug("Update", "error", "РќРµРѕР¶РёРґР°РЅРЅС‹Р№ СЃС‚Р°С‚СѓСЃ РїСЂРё Р·Р°РіСЂСѓР·РєРµ СЃРєСЂРёРїС‚Р°: " .. tostring(status))
         end
     end)
 end
@@ -975,29 +1045,30 @@ local function renderUpdateModal()
     imgui.SetNextWindowPos(imgui.ImVec2(sw / 2, sh / 2), imgui.Cond.Always, imgui.ImVec2(0.5, 0.5))
 
     if not updateState.popupRequested then
-        imgui.OpenPopup(u8("Доступно обновление"))
+        imgui.OpenPopup(u8("Р”РѕСЃС‚СѓРїРЅРѕ РѕР±РЅРѕРІР»РµРЅРёРµ"))
         updateState.popupRequested = true
+        logDebug("Update", "info", "РњРѕРґР°Р»СЊРЅРѕРµ РѕРєРЅРѕ РѕР±РЅРѕРІР»РµРЅРёСЏ РѕС‚РєСЂС‹С‚Рѕ")
     end
 
     local flags = imgui.WindowFlags.NoResize + imgui.WindowFlags.NoMove
-    if imgui.BeginPopupModal(u8("Доступно обновление"), nil, flags) then
+    if imgui.BeginPopupModal(u8("Р”РѕСЃС‚СѓРїРЅРѕ РѕР±РЅРѕРІР»РµРЅРёРµ"), nil, flags) then
 
-        imgui.TextColored(imgui.ImVec4(0.25, 0.80, 0.45, 1.0), u8("Доступна новая версия MapHelp!"))
+        imgui.TextColored(imgui.ImVec4(0.25, 0.80, 0.45, 1.0), u8("Р”РѕСЃС‚СѓРїРЅР° РЅРѕРІР°СЏ РІРµСЂСЃРёСЏ MapHelp!"))
         imgui.Separator()
         imgui.Spacing()
 
-        imgui.Text(u8("Текущая версия: ") .. scriptVersion)
-        imgui.Text(u8("Новая версия:   ") .. tostring(updateState.remoteVersion))
+        imgui.Text(u8("РўРµРєСѓС‰Р°СЏ РІРµСЂСЃРёСЏ: ") .. scriptVersion)
+        imgui.Text(u8("РќРѕРІР°СЏ РІРµСЂСЃРёСЏ:   ") .. tostring(updateState.remoteVersion))
         imgui.Spacing()
 
-        imgui.TextColored(imgui.ImVec4(0.25, 0.53, 0.93, 1.0), u8("Что нового:"))
+        imgui.TextColored(imgui.ImVec4(0.25, 0.53, 0.93, 1.0), u8("Р§С‚Рѕ РЅРѕРІРѕРіРѕ:"))
         imgui.BeginChild("##UpdateLog", imgui.ImVec2(0, 160), true)
         if #updateState.remoteChangelog > 0 then
             for _, line in ipairs(updateState.remoteChangelog) do
                 imgui.BulletText(line)
             end
         else
-            imgui.TextDisabled(u8("Список изменений недоступен."))
+            imgui.TextDisabled(u8("РЎРїРёСЃРѕРє РёР·РјРµРЅРµРЅРёР№ РЅРµРґРѕСЃС‚СѓРїРµРЅ."))
         end
         imgui.EndChild()
 
@@ -1008,20 +1079,21 @@ local function renderUpdateModal()
 
         imgui.Spacing()
         imgui.Separator()
-        imgui.TextWrapped(u8("Для продолжения работы необходимо обновиться. При отказе скрипт будет выгружен."))
+        imgui.TextWrapped(u8("Р”Р»СЏ РїСЂРѕРґРѕР»Р¶РµРЅРёСЏ СЂР°Р±РѕС‚С‹ РЅРµРѕР±С…РѕРґРёРјРѕ РѕР±РЅРѕРІРёС‚СЊСЃСЏ. РџСЂРё РѕС‚РєР°Р·Рµ СЃРєСЂРёРїС‚ Р±СѓРґРµС‚ РІС‹РіСЂСѓР¶РµРЅ."))
         imgui.Spacing()
 
         local btnW = 140
         if not updateState.downloading then
             imgui.PushStyleColor(imgui.Col.Button,        imgui.ImVec4(0.18, 0.60, 0.28, 1.0))
             imgui.PushStyleColor(imgui.Col.ButtonHovered, imgui.ImVec4(0.22, 0.72, 0.35, 1.0))
-            if imgui.Button(u8("Обновить"), imgui.ImVec2(btnW, 30)) then
+            if imgui.Button(u8("РћР±РЅРѕРІРёС‚СЊ"), imgui.ImVec2(btnW, 30)) then
+                logDebug("Update", "info", "РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ РЅР°Р¶Р°Р» 'РћР±РЅРѕРІРёС‚СЊ' вЂ” Р·Р°РїСѓСЃРєР°РµРј Р·Р°РіСЂСѓР·РєСѓ")
                 performScriptUpdate()
             end
             imgui.PopStyleColor(2)
         else
             imgui.PushStyleColor(imgui.Col.Button, imgui.ImVec4(0.18, 0.60, 0.28, 0.5))
-            imgui.Button(u8("Загрузка..."), imgui.ImVec2(btnW, 30))
+            imgui.Button(u8("Р—Р°РіСЂСѓР·РєР°..."), imgui.ImVec2(btnW, 30))
             imgui.PopStyleColor(1)
         end
 
@@ -1030,9 +1102,10 @@ local function renderUpdateModal()
         if not updateState.downloading then
             imgui.PushStyleColor(imgui.Col.Button,        imgui.ImVec4(0.65, 0.15, 0.15, 0.9))
             imgui.PushStyleColor(imgui.Col.ButtonHovered, imgui.ImVec4(0.85, 0.20, 0.20, 1.0))
-            if imgui.Button(u8("Отказаться (выгрузить)"), imgui.ImVec2(200, 30)) then
+            if imgui.Button(u8("РћС‚РєР°Р·Р°С‚СЊСЃСЏ (РІС‹РіСЂСѓР·РёС‚СЊ)"), imgui.ImVec2(200, 30)) then
+                logDebug("Update", "warn", "РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ РЅР°Р¶Р°Р» 'РћС‚РєР°Р·Р°С‚СЊСЃСЏ' вЂ” СЃРєСЂРёРїС‚ Р±СѓРґРµС‚ РІС‹РіСЂСѓР¶РµРЅ")
                 updateState.showModal = false
-                sendGradientMessage("Update", u8("Обновление отклонено. Скрипт выгружен."))
+                sendGradientMessage("Update", u8("РћР±РЅРѕРІР»РµРЅРёРµ РѕС‚РєР»РѕРЅРµРЅРѕ. РЎРєСЂРёРїС‚ РІС‹РіСЂСѓР¶РµРЅ."))
                 lua_thread.create(function()
                     wait(400)
                     thisScript():unload()
@@ -1072,11 +1145,11 @@ function cmd_create_notif(arg)
 
         propTypeStr = propTypeStr:lower()
 
-        if propTypeStr == "0" or propTypeStr == "house" or propTypeStr == "���" then
+        if propTypeStr == "0" or propTypeStr == "house" or propTypeStr == "дом" then
             typeIdx = 0
-        elseif propTypeStr == "1" or propTypeStr == "trailer" or propTypeStr == "�������" then
+        elseif propTypeStr == "1" or propTypeStr == "trailer" or propTypeStr == "трейлер" then
             typeIdx = 1
-        elseif propTypeStr == "2" or propTypeStr == "biz" or propTypeStr == "������" then
+        elseif propTypeStr == "2" or propTypeStr == "biz" or propTypeStr == "бизнес" then
             typeIdx = 2
         end
 
@@ -1110,7 +1183,7 @@ function main()
 
     sampRegisterChatCommand("set_apikey", function(arg)
         if saveConfig(arg) then
-            sendGradientMessage("API", "���� ��������")
+            sendGradientMessage("API", "Ключ сохранен")
         end
     end)
 
@@ -1120,7 +1193,7 @@ function main()
         if not id then
             sendGradientMessage(
                 "House Info",
-                "���������: /house_info [id]"
+                "Используй: /house_info [id]"
             )
             return
         end
@@ -1131,20 +1204,20 @@ function main()
             sendGradientMessage(
                 "House Info",
                 string.format(
-                    "��� �%d | ��������: {FFFFFF}%s{66CCFF} | ��������: {FFFFFF}%s",
+                    "Дом №%d | Владелец: {FFFFFF}%s{66CCFF} | Описание: {FFFFFF}%s",
                     id,
-                    h.owner or "�����������",
-                    h.desc or "�����������"
+                    h.owner or "Отсутствует",
+                    h.desc or "Отсутствует"
                 )
             )
 
-            if h.owner and h.owner ~= "�����������" then
+            if h.owner and h.owner ~= "Отсутствует" then
                 setClipboardText(h.owner)
             end
         else
             sendGradientMessage(
                 "House Info",
-                "{FF3333}��� �� ������ � ���� ������"
+                "{FF3333}Дом не найден в зоне стрима"
             )
         end
     end)
@@ -1155,7 +1228,7 @@ function main()
         if not id then
             sendGradientMessage(
                 "Trailer Info",
-                "���������: /trailer_info [id]"
+                "Используй: /trailer_info [id]"
             )
             return
         end
@@ -1166,19 +1239,19 @@ function main()
             sendGradientMessage(
                 "Trailer Info",
                 string.format(
-                    "������� �%d | ��������: {FFFFFF}%s",
+                    "Трейлер №%d | Владелец: {FFFFFF}%s",
                     id,
-                    t.owner or "�����������"
+                    t.owner or "Отсутствует"
                 )
             )
 
-            if t.owner and t.owner ~= "�����������" then
+            if t.owner and t.owner ~= "Отсутствует" then
                 setClipboardText(t.owner)
             end
         else
             sendGradientMessage(
                 "Trailer Info",
-                "{FF3333}������� �� ������ � ���� ������"
+                "{FF3333}Трейлер не найден в зоне стрима"
             )
         end
     end)
@@ -1189,7 +1262,7 @@ function main()
         if not id then
             sendGradientMessage(
                 "Biz Info",
-                "���������: /biz_info [id]"
+                "Используй: /biz_info [id]"
             )
             return
         end
@@ -1200,54 +1273,54 @@ function main()
             sendGradientMessage(
                 "Biz Info",
                 string.format(
-                    "������ �%d | ��������: {FFFFFF}%s{66CCFF} | ��������: {FFFFFF}%s",
+                    "Бизнес №%d | Владелец: {FFFFFF}%s{66CCFF} | Описание: {FFFFFF}%s",
                     id,
-                    b.owner or "�����������",
-                    b.desc or "�����������"
+                    b.owner or "Отсутствует",
+                    b.desc or "Отсутствует"
                 )
             )
 
-            if b.owner and b.owner ~= "�����������" then
+            if b.owner and b.owner ~= "Отсутствует" then
                 setClipboardText(b.owner)
             end
         else
             sendGradientMessage(
                 "Biz Info",
-                "{FF3333}������ �� ������ � ���� ������"
+                "{FF3333}Бизнес не найден в зоне стрима"
             )
         end
     end)
 
     sampRegisterChatCommand("help_notif", function()
-        local dialogText = "{FFFFFF}��������� �������:\n\n"
+        local dialogText = "{FFFFFF}Доступные команды:\n\n"
 
         dialogText = dialogText ..
-        "{3399FF}/house_info [id] {FFFFFF}- ���������� � ����\n"
+        "{3399FF}/house_info [id] {FFFFFF}- Информация о доме\n"
 
         dialogText = dialogText ..
-        "{3399FF}/trailer_info [id] {FFFFFF}- ���������� � ��������\n"
+        "{3399FF}/trailer_info [id] {FFFFFF}- Информация о трейлере\n"
 
         dialogText = dialogText ..
-        "{3399FF}/biz_info [id] {FFFFFF}- ���������� � �������\n\n"
+        "{3399FF}/biz_info [id] {FFFFFF}- Информация о бизнесе\n\n"
 
         dialogText = dialogText ..
-        "{3399FF}/create_notif {FFFFFF}- ������� ����\n"
+        "{3399FF}/create_notif {FFFFFF}- Открыть меню\n"
 
         dialogText = dialogText ..
-        "{3399FF}/set_apikey [key] {FFFFFF}- ������� API ����"
+        "{3399FF}/set_apikey [key] {FFFFFF}- Указать API ключ"
 
         sampShowDialog(
             9999,
-            "{3399FF}House Desc | ������",
+            "{3399FF}House Desc | Помощь",
             dialogText,
-            "�������",
+            "Закрыть",
             ""
         )
     end)
 
     sendGradientMessage(
         "House Desc",
-        "������ ��������. �������: /help_notif"
+        "Скрипт загружен. Команды: /help_notif"
     )
 
     local scan_timer = os.clock()
@@ -1283,7 +1356,7 @@ function main()
                         -- HOUSE
                         -- =============================
 
-                        if text:find('*** ��� ����� ***') then
+                        if text:find('*** Дом занят ***') then
                             local houseId, desc, owner =
                                 parseHouseData(text)
 
@@ -1301,7 +1374,7 @@ function main()
                         -- TRAILER
                         -- =============================
 
-                        elseif text:find('������� {%x+}�') then
+                        elseif text:find('Трейлер {%x+}№') then
                             local trailerId, owner =
                                 parseTrailerData(text)
 
@@ -1318,7 +1391,7 @@ function main()
                         -- BUSINESS
                         -- =============================
 
-                        elseif text:find('����� �������:') then
+                        elseif text:find('Номер бизнеса:') then
                             local bizId, owner, desc =
                                 parseBizData(text)
 
@@ -1342,7 +1415,7 @@ end
 addEventHandler("onWindowMessage", function(msg, wp)
     local window_open = main_window_state.v or auth_window_state.v
 
-    -- �������� ��� ������� ������ �� ����, ���� ���� ������� -- ����� ImGui-���� ����� �������� ��� �������
+    -- Скрываем все нажатия клавиш от игры, пока окно открыто -- штобы ImGui-поля могли получать все нажатия
     if window_open and (msg == 0x100 or msg == 0x101 or msg == 0x102) then
         consumeWindowMessage(true, false)
     end
