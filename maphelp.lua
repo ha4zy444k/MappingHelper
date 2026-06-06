@@ -17,7 +17,7 @@
 
 script_name("House Desc & Web API Integration (Merged)")
 script_author("haz1k & AI")
-script_version('0.1')
+script_version('0.2')
 
 local sampev = require('lib.samp.events')
 local imgui = require 'imgui'
@@ -147,7 +147,7 @@ local property_type = imgui.ImInt(0)
 local property_id = imgui.ImBuffer(u8(""), 200)
 
 local templates = {
-    { title = u8"Дерево из асфальта", pattern = u8"Уберите объект Дерево из асфальта возле %s %s", state = imgui.ImBool(false) },
+    { title = u8"Дерево из асфальта123", pattern = u8"Уберите объект Дерево из асфальта возле %s %s", state = imgui.ImBool(false) },
     { title = u8"Дерево/гриб на здании", pattern = u8"Уберите дерево/гриб из текстур %s %s", state = imgui.ImBool(false) },
     { title = u8"Грибы из асфальта", pattern = u8"Уберите объект Гриб из асфальта возле %s %s", state = imgui.ImBool(false) },
     { title = u8"Летающий маппинг", pattern = u8"Уберите левитирующие объекты возле %s %s", state = imgui.ImBool(false) },
